@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Layout } from '../components/Layout';
 import { useApp } from '../services/store';
@@ -16,7 +17,9 @@ export const Leave: React.FC = () => {
   const [formData, setFormData] = useState({
     type: LeaveType.PERSONAL,
     allowedBy: '',
-    comment: ''
+    comment: '',
+    startTime: '09:00',
+    endTime: '18:00'
   });
 
   const myLeaves = leaves.filter(l => l.userId === currentUser?.id).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
@@ -45,9 +48,8 @@ export const Leave: React.FC = () => {
         return showToast("請輸入批准人姓名", 'error');
       }
       
-      // Default times: Start at 09:00, End at 18:00
-      const startStr = format(dateRange.start, "yyyy-MM-dd'T'09:00");
-      const endStr = format(dateRange.end, "yyyy-MM-dd'T'18:00");
+      const startStr = format(dateRange.start, "yyyy-MM-dd") + 'T' + formData.startTime;
+      const endStr = format(dateRange.end, "yyyy-MM-dd") + 'T' + formData.endTime;
 
       createLeave({
           startDate: startStr,
@@ -60,7 +62,7 @@ export const Leave: React.FC = () => {
       showToast("假期申請已提交", 'success');
       setStep('HISTORY');
       setDateRange({ start: null, end: null });
-      setFormData({ type: LeaveType.PERSONAL, allowedBy: '', comment: '' });
+      setFormData({ type: LeaveType.PERSONAL, allowedBy: '', comment: '', startTime: '09:00', endTime: '18:00' });
   };
 
   const getStatusColor = (status: RequestStatus, endDate: string) => {
@@ -227,6 +229,27 @@ export const Leave: React.FC = () => {
                           ))}
                       </div>
                   </div>
+
+                   <div className="grid grid-cols-2 gap-4">
+                     <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">開始時間</label>
+                        <input 
+                          type="time" 
+                          className="w-full p-3 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-orange-500 outline-none font-bold text-gray-800"
+                          value={formData.startTime}
+                          onChange={e => setFormData({...formData, startTime: e.target.value})}
+                        />
+                     </div>
+                     <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">結束時間</label>
+                        <input 
+                          type="time" 
+                          className="w-full p-3 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-orange-500 outline-none font-bold text-gray-800"
+                          value={formData.endTime}
+                          onChange={e => setFormData({...formData, endTime: e.target.value})}
+                        />
+                     </div>
+                 </div>
 
                   {formData.type === LeaveType.ALLOWED && (
                       <div className="animate-fade-in">

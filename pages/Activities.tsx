@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Layout } from '../components/Layout';
 import { useApp } from '../services/store';
@@ -200,28 +201,56 @@ export const Activities: React.FC = () => {
                                    <div className="flex items-center gap-2"><Users size={14}/> {acceptedCount} / {a.maxPeople} 人參加</div>
                                </div>
                           </div>
-                          <div className="p-3 bg-gray-50 flex items-center justify-between">
-                              <div className="flex -space-x-2 overflow-hidden pl-2">
-                                  {a.attendees.filter(at => at.status === 'ACCEPTED').map(at => {
-                                      const u = users.find(usr => usr.id === at.userId);
-                                      return <img key={at.userId} src={u?.avatar} className="w-8 h-8 rounded-full border-2 border-white" />;
-                                  })}
+                          
+                          {/* Attendees Section */}
+                          <div className="p-3 bg-gray-50 flex flex-col gap-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-xs font-bold text-gray-400">已參加</span>
+                                    <div className="flex -space-x-2 overflow-hidden pl-2">
+                                        {a.attendees.filter(at => at.status === 'ACCEPTED').map(at => {
+                                            const u = users.find(usr => usr.id === at.userId);
+                                            return <img key={at.userId} src={u?.avatar} className="w-8 h-8 rounded-full border-2 border-white" title={u?.username} />;
+                                        })}
+                                        {a.attendees.filter(at => at.status === 'ACCEPTED').length === 0 && <span className="text-xs text-gray-400 pl-0">暫無人參加</span>}
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => rsvpActivity(a.id, 'REJECTED')}
+                                        className={`p-2 rounded-full ${myRsvp === 'REJECTED' ? 'bg-red-500 text-white' : 'bg-white text-gray-400 border'}`}
+                                    >
+                                        <X size={20} />
+                                    </button>
+                                    <button 
+                                        onClick={() => rsvpActivity(a.id, 'ACCEPTED')}
+                                        disabled={isFull && myRsvp !== 'ACCEPTED'}
+                                        className={`p-2 rounded-full ${myRsvp === 'ACCEPTED' ? 'bg-green-500 text-white' : 'bg-white text-gray-400 border'} ${isFull && myRsvp !== 'ACCEPTED' ? 'opacity-50' : ''}`}
+                                    >
+                                        <Check size={20} />
+                                    </button>
+                                </div>
                               </div>
-                              <div className="flex gap-2">
-                                  <button 
-                                    onClick={() => rsvpActivity(a.id, 'REJECTED')}
-                                    className={`p-2 rounded-full ${myRsvp === 'REJECTED' ? 'bg-red-500 text-white' : 'bg-white text-gray-400 border'}`}
-                                  >
-                                      <X size={20} />
-                                  </button>
-                                  <button 
-                                    onClick={() => rsvpActivity(a.id, 'ACCEPTED')}
-                                    disabled={isFull && myRsvp !== 'ACCEPTED'}
-                                    className={`p-2 rounded-full ${myRsvp === 'ACCEPTED' ? 'bg-green-500 text-white' : 'bg-white text-gray-400 border'} ${isFull && myRsvp !== 'ACCEPTED' ? 'opacity-50' : ''}`}
-                                  >
-                                      <Check size={20} />
-                                  </button>
-                              </div>
+                              
+                              {/* Rejected Users Section */}
+                              {a.attendees.some(at => at.status === 'REJECTED') && (
+                                  <div className="flex flex-col gap-1 pt-2 border-t border-gray-200">
+                                      <span className="text-xs font-bold text-gray-400">已拒絕</span>
+                                      <div className="flex -space-x-2 overflow-hidden pl-2">
+                                          {a.attendees.filter(at => at.status === 'REJECTED').map(at => {
+                                              const u = users.find(usr => usr.id === at.userId);
+                                              return (
+                                                <div key={at.userId} className="relative">
+                                                     <img src={u?.avatar} className="w-6 h-6 rounded-full border-2 border-white grayscale opacity-70" title={u?.username} />
+                                                     <div className="absolute -bottom-1 -right-1 bg-red-500 rounded-full p-[2px] border border-white">
+                                                         <X size={6} className="text-white" />
+                                                     </div>
+                                                </div>
+                                              );
+                                          })}
+                                      </div>
+                                  </div>
+                              )}
                           </div>
                       </div>
                   );

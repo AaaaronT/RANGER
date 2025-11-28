@@ -88,8 +88,12 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Load from localStorage or use initial
   const load = <T,>(key: string, def: T): T => {
-    const s = localStorage.getItem(key);
-    return s ? JSON.parse(s) : def;
+    try {
+        const s = localStorage.getItem(key);
+        return s ? JSON.parse(s) : def;
+    } catch (e) {
+        return def;
+    }
   };
 
   const [currentUser, setCurrentUser] = useState<User | null>(load('currentUser', null));
@@ -140,7 +144,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const login = async (username: string, password: string) => {
-    const user = users.find(u => u.username === username && u.password === password);
+    const cleanUser = username.trim();
+    // Allow password to be exact
+    const user = users.find(u => u.username === cleanUser && u.password === password);
     if (user) {
         if(user.status === UserStatus.ACTIVE || user.id === 'admin-001') {
             setCurrentUser(user);
@@ -155,20 +161,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const logout = () => setCurrentUser(null);
 
   const checkEmailForSetup = (email: string) => {
-    return users.some(u => u.email === email && u.status === UserStatus.WAITING_SETUP);
+    const cleanEmail = email.trim().toLowerCase();
+    return users.some(u => u.email.toLowerCase() === cleanEmail && u.status === UserStatus.WAITING_SETUP);
   };
 
   const register = async (email: string, code: string) => {
-    const validCode = codes.find(c => c.code === code && c.expiresAt > Date.now());
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanCode = code.trim().toUpperCase();
+
+    const validCode = codes.find(c => c.code === cleanCode && c.expiresAt > Date.now());
     if (!validCode) return { success: false, message: "驗證碼無效或已過期" };
     
-    const existing = users.find(u => u.email === email);
+    const existing = users.find(u => u.email.toLowerCase() === cleanEmail);
     if (existing) return { success: false, message: "電郵已被使用" };
 
     const newUser: User = {
       id: Date.now().toString(),
       username: `User${Date.now().toString().slice(-4)}`, // Temp username
-      email,
+      email: cleanEmail, // Store cleaned email
       avatar: 'https://picsum.photos/200',
       role: 'user',
       permissions: [],
@@ -176,20 +186,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       joinedAt: new Date().toISOString()
     };
 
-    setUsers([...users, newUser]);
-    notifyAdmin("新用戶註冊", `電郵 ${email} 正在等待批准`);
+    setUsers(prev => [...prev, newUser]);
+    notifyAdmin("新用戶註冊", `電郵 ${cleanEmail} 正在等待批准`);
     return { success: true, message: "SUCCESS" };
   };
 
   const firstTimeSetup = async (email: string, username: string, password: string, avatar: string) => {
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanUsername = username.trim();
+
       const updatedUsers = users.map(u => {
-          if (u.email === email && u.status === UserStatus.WAITING_SETUP) {
-              return { ...u, username, password, avatar, status: UserStatus.ACTIVE };
+          if (u.email.toLowerCase() === cleanEmail && u.status === UserStatus.WAITING_SETUP) {
+              return { ...u, username: cleanUsername, password, avatar, status: UserStatus.ACTIVE };
           }
           return u;
       });
       setUsers(updatedUsers);
-      const user = updatedUsers.find(u => u.email === email);
+      const user = updatedUsers.find(u => u.email.toLowerCase() === cleanEmail);
       if (user) {
           setCurrentUser(user);
           return { success: true, message: "Setup Complete" };
@@ -204,7 +217,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       expiresAt: Date.now() + 30 * 60 * 1000, // 30 mins
       createdBy: currentUser?.id || 'system'
     };
-    setCodes([...codes, newCode]);
+    setCodes(prev => [...prev, newCode]);
     return code;
   };
 
@@ -329,20 +342,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Inventory Management
   const addCategory = (name: string) => {
-    setCategories([...categories, { id: 'cat-' + Date.now(), name }]);
+    setCategories(prev => [...prev, { id: 'cat-' + Date.now(), name }]);
   };
 
   const deleteCategory = (id: string) => {
-    setCategories(categories.filter(c => c.id !== id));
-    setInventory(inventory.filter(i => i.categoryId !== id)); // Cascade delete
+    setCategories(prev => prev.filter(c => c.id !== id));
+    setInventory(prev => prev.filter(i => i.categoryId !== id)); // Cascade delete
   };
 
   const addInventoryItem = (item: Omit<InventoryItem, 'id'>) => {
-    setInventory([...inventory, { ...item, id: 'item-' + Date.now() }]);
+    setInventory(prev => [...prev, { ...item, id: 'item-' + Date.now() }]);
   };
 
   const deleteInventoryItem = (id: string) => {
-    setInventory(inventory.filter(i => i.id !== id));
+    setInventory(prev => prev.filter(i => i.id !== id));
   };
 
   return (

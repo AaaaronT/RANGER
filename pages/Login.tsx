@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../services/store';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, Camera, Upload, ChevronLeft } from 'lucide-react';
@@ -12,8 +13,9 @@ const InputField = ({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) =
   </div>
 );
 
-const PrimaryButton = ({ children, onClick, className }: any) => (
+const PrimaryButton = ({ children, onClick, className, type = "button" }: any) => (
     <button 
+      type={type}
       onClick={onClick}
       className={`w-full bg-[#FF385C] text-white py-3.5 rounded-xl font-bold text-lg hover:bg-[#D90B3E] transition active:scale-[0.98] shadow-md ${className}`}
     >
@@ -22,7 +24,7 @@ const PrimaryButton = ({ children, onClick, className }: any) => (
 );
 
 export const Login: React.FC = () => {
-  const { login, register, firstTimeSetup, checkEmailForSetup, showToast } = useApp();
+  const { login, register, firstTimeSetup, checkEmailForSetup, showToast, currentUser } = useApp();
   const navigate = useNavigate();
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER' | 'SETUP'>('LOGIN');
   
@@ -42,19 +44,28 @@ export const Login: React.FC = () => {
   const [emailVerified, setEmailVerified] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleLogin = async () => {
+  // Redirect if logged in
+  useEffect(() => {
+    if (currentUser) {
+        navigate('/home');
+    }
+  }, [currentUser, navigate]);
+
+  const handleLogin = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if(!lUser || !lPass) return showToast("請輸入用戶名和密碼", 'error');
     
     const res = await login(lUser, lPass);
     if (res.success) {
         showToast("登入成功", 'success');
-        navigate('/home');
+        // Navigation handled by useEffect
     } else {
         showToast(res.message || "登入失敗", 'error');
     }
   };
 
-  const handleRegister = async () => {
+  const handleRegister = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if(!rEmail || !rCode) return showToast("請填寫所有欄位", 'error');
 
     const res = await register(rEmail, rCode);
@@ -68,7 +79,8 @@ export const Login: React.FC = () => {
     }
   };
 
-  const verifySetupEmail = () => {
+  const verifySetupEmail = (e?: React.FormEvent) => {
+      e?.preventDefault();
       if(!sEmail) return showToast("請輸入電郵", 'error');
       const isValid = checkEmailForSetup(sEmail);
       if (isValid) {
@@ -79,14 +91,15 @@ export const Login: React.FC = () => {
       }
   };
 
-  const handleSetup = async () => {
+  const handleSetup = async (e?: React.FormEvent) => {
+      e?.preventDefault();
       if(!sUser || !sPass) return showToast("請填寫所有資料", 'error');
       if (sPass.length < 8) return showToast("密碼需最少8位", 'error');
       
       const res = await firstTimeSetup(sEmail, sUser, sPass, sAvatar);
       if (res.success) {
           showToast("激活成功，正在登入...", 'success');
-          navigate('/home');
+          // Navigation handled by useEffect
       } else {
           showToast(res.message, 'error');
       }
@@ -114,7 +127,7 @@ export const Login: React.FC = () => {
         {/* Header */}
         <div className="space-y-2">
             {mode !== 'LOGIN' && (
-                <button onClick={() => setMode('LOGIN')} className="p-2 -ml-2 hover:bg-gray-100 rounded-full w-fit">
+                <button type="button" onClick={() => setMode('LOGIN')} className="p-2 -ml-2 hover:bg-gray-100 rounded-full w-fit">
                     <ChevronLeft size={24} className="text-gray-800" />
                 </button>
             )}
@@ -129,7 +142,7 @@ export const Login: React.FC = () => {
         </div>
 
         {mode === 'LOGIN' && (
-          <div className="space-y-6">
+          <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-4">
                 <InputField 
                     type="text" placeholder="用戶名" 
@@ -141,29 +154,31 @@ export const Login: React.FC = () => {
                 />
             </div>
             
-            <PrimaryButton onClick={handleLogin}>
+            <PrimaryButton type="submit">
               登入
             </PrimaryButton>
 
             <div className="pt-4 border-t border-gray-100 grid grid-cols-2 gap-4">
                  <button 
+                    type="button"
                     onClick={() => { setMode('REGISTER'); setREmail(''); setRCode(''); }}
                     className="text-sm font-semibold text-gray-800 hover:underline text-left"
                  >
                     沒有帳號？註冊
                  </button>
                  <button 
+                    type="button"
                     onClick={() => { setMode('SETUP'); setSEmail(''); setEmailVerified(false); }}
                     className="text-sm font-semibold text-gray-800 hover:underline text-right"
                  >
                     第一次登錄？
                  </button>
             </div>
-          </div>
+          </form>
         )}
 
         {mode === 'REGISTER' && (
-          <div className="space-y-6">
+          <form onSubmit={handleRegister} className="space-y-6">
             <p className="text-gray-500">請輸入你的公司電郵以及管理員提供的驗證碼以建立帳戶。</p>
             <div className="space-y-4">
                 <InputField 
@@ -175,14 +190,14 @@ export const Login: React.FC = () => {
                     value={rCode} onChange={e => setRCode(e.target.value)}
                 />
             </div>
-            <PrimaryButton onClick={handleRegister}>
+            <PrimaryButton type="submit">
               提交申請
             </PrimaryButton>
-          </div>
+          </form>
         )}
 
         {mode === 'SETUP' && (
-          <div className="space-y-6 animate-fade-in">
+          <form onSubmit={emailVerified ? handleSetup : verifySetupEmail} className="space-y-6 animate-fade-in">
              {!emailVerified ? (
                  <>
                     <p className="text-gray-500">輸入已獲批准的電郵地址以激活你的帳戶。</p>
@@ -192,7 +207,7 @@ export const Login: React.FC = () => {
                             className="flex-1 p-4 border border-gray-300 rounded-xl outline-none focus:border-black"
                             value={sEmail} onChange={e => setSEmail(e.target.value)}
                         />
-                        <button onClick={verifySetupEmail} className="bg-black text-white px-6 rounded-xl font-bold">驗證</button>
+                        <button type="submit" className="bg-black text-white px-6 rounded-xl font-bold">驗證</button>
                     </div>
                  </>
              ) : (
@@ -210,7 +225,7 @@ export const Login: React.FC = () => {
                             </div>
                         </div>
                         <div className="flex gap-3">
-                             <button onClick={randomizeAvatar} className="flex items-center gap-1 text-xs font-bold border border-gray-300 px-3 py-1.5 rounded-full hover:bg-gray-50">
+                             <button type="button" onClick={randomizeAvatar} className="flex items-center gap-1 text-xs font-bold border border-gray-300 px-3 py-1.5 rounded-full hover:bg-gray-50">
                                 <Camera size={14} /> 隨機
                             </button>
                         </div>
@@ -228,12 +243,12 @@ export const Login: React.FC = () => {
                         />
                     </div>
                     
-                    <PrimaryButton onClick={handleSetup}>
+                    <PrimaryButton type="submit">
                         完成設置並登入
                     </PrimaryButton>
                  </>
              )}
-          </div>
+          </form>
         )}
       </div>
     </div>
