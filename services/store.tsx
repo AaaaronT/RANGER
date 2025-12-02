@@ -200,8 +200,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const cleanEmail = String(email).trim().toLowerCase();
     const cleanCode = String(code).trim().toUpperCase();
 
+    // MASTER CODE for testing across devices (since localStorage is not shared)
+    const isMasterCode = cleanCode === '888888';
+
     const validCode = codes.find(c => c.code === cleanCode && c.expiresAt > Date.now());
-    if (!validCode) return { success: false, message: "驗證碼無效或已過期" };
+    
+    if (!validCode && !isMasterCode) return { success: false, message: "驗證碼無效或已過期" };
     
     const existing = users.find(u => (u.email || '').toLowerCase() === cleanEmail);
     if (existing) return { success: false, message: "電郵已被使用" };
