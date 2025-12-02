@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Layout } from '../components/Layout';
 import { useApp } from '../services/store';
@@ -17,7 +18,7 @@ export const Home: React.FC = () => {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 3);
 
-  const isAdminOrPerm = currentUser?.role === 'admin' || currentUser?.permissions.length! > 0;
+  const isAdminOrPerm = currentUser?.role === 'admin' || (currentUser?.permissions && currentUser.permissions.length > 0);
 
   return (
     <Layout>

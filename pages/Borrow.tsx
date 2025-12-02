@@ -4,7 +4,7 @@ import { Layout } from '../components/Layout';
 import { useApp } from '../services/store';
 import { RequestStatus, InventoryItem } from '../types';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addMonths, isSameDay, isWithinInterval, isBefore, isToday } from 'date-fns';
-import { Check, Plus, Trash2, Search, ShoppingBag, ArrowRight, Settings, X, Upload, Image as ImageIcon, Calendar as CalIcon, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { Check, Plus, Trash2, Search, ShoppingBag, ArrowRight, Settings, X, Upload, Image as ImageIcon, Calendar as CalIcon, ChevronLeft, ChevronRight, Clock, Info } from 'lucide-react';
 
 type Step = 'SELECT' | 'DATE' | 'DETAILS' | 'HISTORY' | 'ADMIN';
 
@@ -14,7 +14,7 @@ export const Borrow: React.FC = () => {
 
   // Admin States
   const [newCatName, setNewCatName] = useState('');
-  const [newItem, setNewItem] = useState({ name: '', categoryId: '', imageUrl: '' });
+  const [newItem, setNewItem] = useState<{name: string, categoryId: string, imageUrl: string, note: string}>({ name: '', categoryId: '', imageUrl: '', note: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isAdmin = currentUser?.username === 'AaronTsang';
 
@@ -140,7 +140,7 @@ export const Borrow: React.FC = () => {
   const handleAddItem = () => {
     if (!newItem.name || !newItem.categoryId || !newItem.imageUrl) return showToast("請填寫所有物品資料及圖片", 'error');
     addInventoryItem(newItem);
-    setNewItem({ name: '', categoryId: '', imageUrl: '' });
+    setNewItem({ name: '', categoryId: '', imageUrl: '', note: '' });
     showToast("物品已新增", 'success');
   };
 
@@ -242,7 +242,8 @@ export const Borrow: React.FC = () => {
       {step === 'ADMIN' && (
         <div className="space-y-6 pb-20">
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-            <h3 className="font-bold text-gray-800 mb-3 text-lg">新增物品</h3>
+            <h3 className="font-bold text-gray-800 mb-3 text-lg">新增物品 / 套裝</h3>
+            <p className="text-xs text-gray-500 mb-4">如果是多件物品組成的套裝（如航拍機套組），請上傳一張代表圖片，並在備註中說明詳情。</p>
             <div className="space-y-4">
                 {/* Image Upload Area */}
                 <div 
@@ -269,7 +270,7 @@ export const Borrow: React.FC = () => {
 
                 <input 
                   className="w-full border p-3 rounded-xl bg-gray-50 focus:ring-2 focus:ring-black outline-none transition" 
-                  placeholder="物品名稱 e.g. MacBook Pro" 
+                  placeholder="物品名稱 / 套裝名稱 e.g. DJI Mavic 3 Set" 
                   value={newItem.name}
                   onChange={e => setNewItem({...newItem, name: e.target.value})}
                 />
@@ -282,6 +283,13 @@ export const Borrow: React.FC = () => {
                    <option value="">選擇分類</option>
                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
+
+                <textarea
+                  className="w-full border p-3 rounded-xl bg-gray-50 focus:ring-2 focus:ring-black outline-none transition min-h-[80px]"
+                  placeholder="備註 / 套裝內容 / 注意事項 (用戶選擇時會看到) e.g. 包含3顆電池，需另外租借SD卡"
+                  value={newItem.note}
+                  onChange={e => setNewItem({...newItem, note: e.target.value})}
+                />
 
                 <button onClick={handleAddItem} className="w-full bg-black text-white py-3 rounded-xl font-bold hover:bg-gray-800 transition">新增物品</button>
             </div>
@@ -317,7 +325,8 @@ export const Borrow: React.FC = () => {
                           <img src={item.imageUrl} className="w-12 h-12 object-cover rounded-lg bg-gray-200" />
                           <div>
                               <p className="font-bold text-gray-800 text-sm">{item.name}</p>
-                              <p className="text-xs text-gray-500">{categories.find(c => c.id === item.categoryId)?.name}</p>
+                              {item.note && <p className="text-xs text-orange-500 flex items-center gap-1 mt-0.5"><Info size={10}/> {item.note}</p>}
+                              <p className="text-xs text-gray-400 mt-0.5">{categories.find(c => c.id === item.categoryId)?.name}</p>
                           </div>
                        </div>
                        <button onClick={() => deleteInventoryItem(item.id)} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={18}/></button>
@@ -400,6 +409,11 @@ export const Borrow: React.FC = () => {
                       <div>
                          <h4 className="font-bold text-gray-900 leading-tight text-sm line-clamp-2">{item.name}</h4>
                          <p className="text-gray-500 text-xs mt-1">{categoryName}</p>
+                         {item.note && (
+                             <p className="text-[10px] text-orange-600 mt-1 bg-orange-50 px-1.5 py-0.5 rounded w-fit flex items-center gap-1">
+                                 <Info size={10} className="shrink-0"/> {item.note}
+                             </p>
+                         )}
                       </div>
                    </div>
                 );
@@ -484,12 +498,20 @@ export const Borrow: React.FC = () => {
                  </h3>
                  <div className="space-y-4">
                      {selectedItems.map(item => (
-                         <div key={item.id} className="flex items-center gap-4 border-b border-gray-100 pb-3 last:border-0 last:pb-0">
-                             <img src={item.imageUrl} className="w-16 h-16 rounded-xl object-cover bg-gray-100" />
-                             <div>
-                                 <span className="font-bold text-gray-800 block">{item.name}</span>
-                                 <span className="text-xs text-gray-500">{categories.find(c => c.id === item.categoryId)?.name}</span>
+                         <div key={item.id} className="flex flex-col gap-2 border-b border-gray-100 pb-3 last:border-0 last:pb-0">
+                             <div className="flex items-center gap-4">
+                                <img src={item.imageUrl} className="w-16 h-16 rounded-xl object-cover bg-gray-100" />
+                                <div>
+                                    <span className="font-bold text-gray-800 block">{item.name}</span>
+                                    <span className="text-xs text-gray-500">{categories.find(c => c.id === item.categoryId)?.name}</span>
+                                </div>
                              </div>
+                             {item.note && (
+                                 <div className="bg-orange-50 p-2 rounded-lg text-xs text-orange-700 flex items-start gap-2">
+                                     <Info size={14} className="mt-0.5 shrink-0"/>
+                                     <span>{item.note}</span>
+                                 </div>
+                             )}
                          </div>
                      ))}
                  </div>

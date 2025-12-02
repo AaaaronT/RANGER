@@ -189,7 +189,10 @@ export const Activities: React.FC = () => {
                           )}
                           <div className="p-4 border-b border-gray-100">
                                <div className="flex justify-between items-start">
-                                  <h3 className="text-lg font-bold text-gray-800">{a.title}</h3>
+                                  <div className="flex items-center gap-2">
+                                     <h3 className="text-lg font-bold text-gray-800">{a.title}</h3>
+                                     {isFull && <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">已額滿</span>}
+                                  </div>
                                   <span className={`text-xs px-2 py-1 rounded bg-gray-100 font-bold text-gray-600`}>
                                       {a.totalPrice ? `$${a.totalPrice}` : 'Free'}
                                   </span>
@@ -225,7 +228,8 @@ export const Activities: React.FC = () => {
                                     <button 
                                         onClick={() => rsvpActivity(a.id, 'ACCEPTED')}
                                         disabled={isFull && myRsvp !== 'ACCEPTED'}
-                                        className={`p-2 rounded-full ${myRsvp === 'ACCEPTED' ? 'bg-green-500 text-white' : 'bg-white text-gray-400 border'} ${isFull && myRsvp !== 'ACCEPTED' ? 'opacity-50' : ''}`}
+                                        className={`p-2 rounded-full transition-all ${myRsvp === 'ACCEPTED' ? 'bg-green-500 text-white' : 'bg-white text-gray-400 border'} ${(isFull && myRsvp !== 'ACCEPTED') ? 'opacity-30 cursor-not-allowed bg-gray-100' : ''}`}
+                                        title={isFull ? '人數已滿' : '參加'}
                                     >
                                         <Check size={20} />
                                     </button>

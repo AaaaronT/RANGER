@@ -1,3 +1,4 @@
+
 export enum UserStatus {
   PENDING_APPROVAL = 'PENDING_APPROVAL',
   WAITING_SETUP = 'WAITING_SETUP',
@@ -67,6 +68,7 @@ export interface InventoryItem {
   name: string;
   categoryId: string;
   imageUrl: string;
+  note?: string; // New field for bundle details or warnings
 }
 
 export interface Category {

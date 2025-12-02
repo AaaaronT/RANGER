@@ -28,11 +28,11 @@ const INITIAL_CATEGORIES: Category[] = [
 ];
 
 const INITIAL_INVENTORY: InventoryItem[] = [
-    { id: 'item-1', name: 'MacBook Pro 16"', categoryId: 'cat-1', imageUrl: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca4?w=600&q=80' },
-    { id: 'item-2', name: 'Canon 4K Projector', categoryId: 'cat-1', imageUrl: 'https://images.unsplash.com/photo-1517430529647-90c851885834?w=600&q=80' },
+    { id: 'item-1', name: 'MacBook Pro 16"', categoryId: 'cat-1', imageUrl: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca4?w=600&q=80', note: '包含充電器' },
+    { id: 'item-2', name: 'Canon 4K Projector', categoryId: 'cat-1', imageUrl: 'https://images.unsplash.com/photo-1517430529647-90c851885834?w=600&q=80', note: '需自備 HDMI 線' },
     { id: 'item-3', name: 'Herman Miller Chair', categoryId: 'cat-3', imageUrl: 'https://images.unsplash.com/photo-1505843490538-5133c6c7d0e1?w=600&q=80' },
-    { id: 'item-4', name: 'Whiteboard Marker Set', categoryId: 'cat-2', imageUrl: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=600&q=80' },
-    { id: 'item-5', name: 'Sony Alpha Camera', categoryId: 'cat-1', imageUrl: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&q=80' },
+    { id: 'item-4', name: 'Whiteboard Marker Set', categoryId: 'cat-2', imageUrl: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=600&q=80', note: '一盒 4 色' },
+    { id: 'item-5', name: 'Sony Alpha Camera', categoryId: 'cat-1', imageUrl: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&q=80', note: '包含鏡頭與電池，不含 SD 卡' },
 ];
 
 export interface ToastData {
@@ -86,22 +86,48 @@ interface AppContextType extends AppState {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Load from localStorage or use initial
+  // Load from localStorage or use initial with safety check
   const load = <T,>(key: string, def: T): T => {
     try {
         const s = localStorage.getItem(key);
-        return s ? JSON.parse(s) : def;
+        if (!s) return def;
+        const parsed = JSON.parse(s);
+        return parsed === null ? def : parsed;
     } catch (e) {
+        console.error(`Failed to load ${key}`, e);
         return def;
     }
   };
 
-  const [currentUser, setCurrentUser] = useState<User | null>(load('currentUser', null));
-  const [users, setUsers] = useState<User[]>(load('users', [INITIAL_ADMIN]));
+  // Helper to ensure user object has all required fields (handling old data)
+  const sanitizeUser = (u: any): User => ({
+      ...u,
+      permissions: Array.isArray(u.permissions) ? u.permissions : [],
+      email: u.email || '',
+      avatar: u.avatar || 'https://picsum.photos/200',
+      status: u.status || UserStatus.PENDING_APPROVAL
+  });
+
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+      const u = load<User | null>('currentUser', null);
+      return u ? sanitizeUser(u) : null;
+  });
+
+  const [users, setUsers] = useState<User[]>(() => {
+      const loaded = load<User[]>('users', [INITIAL_ADMIN]);
+      return Array.isArray(loaded) ? loaded.map(sanitizeUser) : [INITIAL_ADMIN];
+  });
+
   const [codes, setCodes] = useState<RegistrationCode[]>(load('codes', []));
   const [leaves, setLeaves] = useState<LeaveRequest[]>(load('leaves', []));
   const [loans, setLoans] = useState<LoanRequest[]>(load('loans', []));
-  const [announcements, setAnnouncements] = useState<Announcement[]>(load('announcements', []));
+  
+  // Sanitize announcements to ensure readBy exists
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
+      const loaded = load<Announcement[]>('announcements', []);
+      return loaded.map(a => ({ ...a, readBy: Array.isArray(a.readBy) ? a.readBy : [] }));
+  });
+  
   const [activities, setActivities] = useState<Activity[]>(load('activities', []));
   const [notifications, setNotifications] = useState<Notification[]>(load('notifications', []));
   const [inventory, setInventory] = useState<InventoryItem[]>(load('inventory', INITIAL_INVENTORY));
@@ -125,7 +151,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setTimeout(() => setToast(null), 3000);
   };
 
-  // Helper to add notification
   const notifyUser = (userId: string, title: string, message: string, type: any) => {
     const newNotif: Notification = {
       id: Date.now().toString() + Math.random(),
@@ -140,15 +165,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const notifyAdmin = (title: string, message: string) => {
-    notifyUser('admin-001', title, message, 'SYSTEM');
+    // Find admin dynamically or fallback to hardcoded ID
+    const adminId = users.find(u => u.role === 'admin')?.id || 'admin-001';
+    notifyUser(adminId, title, message, 'SYSTEM');
   };
 
   const login = async (username: string, password: string) => {
-    const cleanUser = username.trim();
-    // Allow password to be exact
+    if (!username || !password) return { success: false, message: "請輸入用戶名和密碼" };
+    const cleanUser = String(username).trim();
+    
     const user = users.find(u => u.username === cleanUser && u.password === password);
     if (user) {
-        if(user.status === UserStatus.ACTIVE || user.id === 'admin-001') {
+        if(user.status === UserStatus.ACTIVE || user.role === 'admin') {
             setCurrentUser(user);
             return { success: true };
         } else {
@@ -161,26 +189,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const logout = () => setCurrentUser(null);
 
   const checkEmailForSetup = (email: string) => {
-    const cleanEmail = email.trim().toLowerCase();
-    return users.some(u => u.email.toLowerCase() === cleanEmail && u.status === UserStatus.WAITING_SETUP);
+    if (!email) return false;
+    const cleanEmail = String(email).trim().toLowerCase();
+    // Safety check for u.email existence
+    return users.some(u => (u.email || '').toLowerCase() === cleanEmail && u.status === UserStatus.WAITING_SETUP);
   };
 
   const register = async (email: string, code: string) => {
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanCode = code.trim().toUpperCase();
+    if (!email || !code) return { success: false, message: "資料不完整" };
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanCode = String(code).trim().toUpperCase();
 
     const validCode = codes.find(c => c.code === cleanCode && c.expiresAt > Date.now());
     if (!validCode) return { success: false, message: "驗證碼無效或已過期" };
     
-    const existing = users.find(u => u.email.toLowerCase() === cleanEmail);
+    const existing = users.find(u => (u.email || '').toLowerCase() === cleanEmail);
     if (existing) return { success: false, message: "電郵已被使用" };
 
     const newUser: User = {
       id: Date.now().toString(),
-      username: `User${Date.now().toString().slice(-4)}`, // Temp username
-      email: cleanEmail, // Store cleaned email
+      username: `User${Date.now().toString().slice(-4)}`,
+      email: cleanEmail,
       avatar: 'https://picsum.photos/200',
       role: 'user',
+      password: '', // Explicitly set empty for safety
       permissions: [],
       status: UserStatus.PENDING_APPROVAL,
       joinedAt: new Date().toISOString()
@@ -192,17 +224,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const firstTimeSetup = async (email: string, username: string, password: string, avatar: string) => {
-      const cleanEmail = email.trim().toLowerCase();
-      const cleanUsername = username.trim();
+      const cleanEmail = String(email).trim().toLowerCase();
+      const cleanUsername = String(username).trim();
 
+      let found = false;
       const updatedUsers = users.map(u => {
-          if (u.email.toLowerCase() === cleanEmail && u.status === UserStatus.WAITING_SETUP) {
+          if ((u.email || '').toLowerCase() === cleanEmail && u.status === UserStatus.WAITING_SETUP) {
+              found = true;
               return { ...u, username: cleanUsername, password, avatar, status: UserStatus.ACTIVE };
           }
           return u;
       });
+
+      if (!found) return { success: false, message: "Setup Failed: User not found" };
+
       setUsers(updatedUsers);
-      const user = updatedUsers.find(u => u.email.toLowerCase() === cleanEmail);
+      const user = updatedUsers.find(u => (u.email || '').toLowerCase() === cleanEmail);
       if (user) {
           setCurrentUser(user);
           return { success: true, message: "Setup Complete" };
@@ -222,11 +259,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateUserStatus = (userId: string, status: UserStatus) => {
-    setUsers(users.map(u => u.id === userId ? { ...u, status } : u));
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u));
   };
 
   const updateUserPermissions = (userId: string, permissions: Permission[]) => {
-      setUsers(users.map(u => u.id === userId ? { ...u, permissions } : u));
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, permissions } : u));
   };
 
   const updateUserProfile = (userId: string, data: { username?: string, password?: string, avatar?: string }) => {
@@ -247,23 +284,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const createLeave = (data: any) => {
       if (!currentUser) return;
       const req: LeaveRequest = { ...data, id: Date.now().toString(), userId: currentUser.id, status: RequestStatus.PENDING, createdAt: new Date().toISOString() };
-      setLeaves([req, ...leaves]);
+      setLeaves(prev => [req, ...prev]);
       notifyAdmin("新假期申請", `${currentUser.username} 申請 ${data.type}`);
   };
 
   const createLoan = (data: any) => {
     if (!currentUser) return;
     const req: LoanRequest = { ...data, id: Date.now().toString(), userId: currentUser.id, status: RequestStatus.PENDING, createdAt: new Date().toISOString() };
-    setLoans([req, ...loans]);
+    setLoans(prev => [req, ...prev]);
     notifyAdmin("新借物申請", `${currentUser.username} 想借 ${data.itemName}`);
   };
 
   const createAnnouncement = (data: any) => {
       if (!currentUser) return;
       const ann: Announcement = { ...data, id: Date.now().toString(), creatorId: currentUser.id, readBy: [], createdAt: new Date().toISOString() };
-      setAnnouncements([ann, ...announcements]);
+      setAnnouncements(prev => [ann, ...prev]);
       // Notify targets
-      const targets = data.isPublic ? users.filter(u => u.status === UserStatus.ACTIVE) : users.filter(u => data.targetUserIds.includes(u.id));
+      const targets = data.isPublic ? users.filter(u => u.status === UserStatus.ACTIVE) : users.filter(u => (data.targetUserIds || []).includes(u.id));
       targets.forEach((t: User) => {
           if (t.id !== currentUser.id) notifyUser(t.id, "新公告", `來自 ${currentUser.username} 的公告`, 'ANNOUNCEMENT');
       });
@@ -272,9 +309,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const createActivity = (data: any) => {
       if (!currentUser) return;
       const act: Activity = { ...data, id: Date.now().toString(), creatorId: currentUser.id, attendees: [], createdAt: new Date().toISOString() };
-      setActivities([act, ...activities]);
+      setActivities(prev => [act, ...prev]);
       // Notify targets
-      const targets = data.isPublic ? users.filter(u => u.status === UserStatus.ACTIVE) : users.filter(u => data.targetUserIds.includes(u.id));
+      const targets = data.isPublic ? users.filter(u => u.status === UserStatus.ACTIVE) : users.filter(u => (data.targetUserIds || []).includes(u.id));
       targets.forEach((t: User) => {
           if (t.id !== currentUser.id) notifyUser(t.id, "新活動", `${currentUser.username} 舉辦了 ${data.title}`, 'ACTIVITY');
       });
@@ -299,12 +336,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       let error = '';
       setActivities(prev => prev.map(a => {
           if (a.id === id) {
-              const currentAttendees = a.attendees.filter(att => att.userId !== currentUser.id);
-              if (status === 'ACCEPTED' && currentAttendees.filter(att => att.status === 'ACCEPTED').length >= a.maxPeople) {
-                  error = "人數已滿，無法參加";
-                  return a;
+              const currentAttendees = a.attendees.filter(att => att.userId !== currentUser.id && att.status === 'ACCEPTED');
+              
+              // CRITICAL: Check capacity before accepting
+              if (status === 'ACCEPTED' && currentAttendees.length >= a.maxPeople) {
+                  // If I'm already accepted, it's fine. If I'm not, block me.
+                  const myCurrentStatus = a.attendees.find(att => att.userId === currentUser.id)?.status;
+                  if (myCurrentStatus !== 'ACCEPTED') {
+                    error = "活動人數已滿，無法報名";
+                    return a;
+                  }
               }
-              return { ...a, attendees: [...currentAttendees, { userId: currentUser.id, status }] };
+
+              const newAttendees = a.attendees.filter(att => att.userId !== currentUser.id);
+              return { ...a, attendees: [...newAttendees, { userId: currentUser.id, status }] };
           }
           return a;
       }));
